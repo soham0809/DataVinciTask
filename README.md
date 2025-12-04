@@ -1,179 +1,119 @@
-## Grippi Campaign Analytics Dashboard (Simplified)
+# Campaign Analytics Dashboard
 
-This is a very small full‑stack app that shows a list of marketing campaigns in a table with a simple status filter.
+A full-stack web application for managing and analyzing marketing campaigns. Built with Next.js and FastAPI, this dashboard provides real-time campaign metrics, status management, and filtering capabilities.
 
-- **Frontend**: Next.js (React, Typescript) with plain CSS  
-- **Backend**: FastAPI (Python) with PostgreSQL  
-- **Database script**: `database.sql` (PostgreSQL)
+## 🎯 Overview
 
----
+The Campaign Analytics Dashboard is a simplified version of a marketing campaign management system. It allows users to view, create, and manage marketing campaigns with real-time status updates and comprehensive analytics.
 
-## 1. Project Structure
+## ✨ Features
 
-- **frontend** – Next.js app (table UI and filter)
-- **backend** – FastAPI app (`/Campaign` endpoint)
-- **database.sql** – SQL to create and seed the `campaigns` table
+- **Campaign Management**: Create, view, and manage marketing campaigns
+- **Status Toggle**: Switch campaigns between Active and Paused states with a single click
+- **Real-time Filtering**: Filter campaigns by status (All, Active, Paused)
+- **Campaign Metrics**: Track clicks, cost, and impressions for each campaign
+- **Responsive Design**: Modern, dark-themed UI that works on all devices
+- **RESTful API**: Clean API endpoints for campaign operations
 
----
+## 🏗️ Architecture
 
-## 🚀 Quick Start - Deployment
+### Frontend
+- **Framework**: Next.js 14 with React and TypeScript
+- **Styling**: Custom CSS with dark theme
+- **State Management**: React Hooks (useState, useEffect)
+- **API Integration**: Fetch API for backend communication
 
-For detailed deployment instructions, see **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)**
+### Backend
+- **Framework**: FastAPI (Python)
+- **Database**: PostgreSQL (hosted on Railway)
+- **ORM**: SQLAlchemy for database operations
+- **API Documentation**: Auto-generated Swagger/OpenAPI docs
 
-**Quick Summary**:
-- **Backend**: Deploy to Railway (set root directory to `backend`)
-- **Frontend**: Deploy to Vercel (set root directory to `frontend`)
-- **Environment Variables**: Set `DATABASE_URL` and `CORS_ORIGINS` in Railway, `NEXT_PUBLIC_API_BASE_URL` in Vercel
+### Database
+- **Type**: PostgreSQL
+- **Schema**: Single `campaigns` table with fields for name, status, clicks, cost, and impressions
 
----
+## 📊 Data Model
 
-## 2. Backend (FastAPI)
+### Campaign
+Each campaign contains:
+- **ID**: Unique identifier (auto-incremented)
+- **Name**: Campaign name
+- **Status**: Either "Active" or "Paused"
+- **Clicks**: Number of clicks (default: 0)
+- **Cost**: Campaign cost in USD (default: 0.00)
+- **Impressions**: Number of impressions (default: 0)
 
-### 2.1. Environment Setup
+## 🔌 API Endpoints
 
-Create a `.env` file in the `backend` folder:
+### `GET /Campaign`
+Retrieves all campaigns with optional filtering and pagination.
 
-```bash
-cd backend
+**Response**: Array of campaign objects
+
+### `POST /Campaign`
+Creates a new campaign with default values.
+
+**Request Body**:
+```json
+{
+  "name": "Campaign Name",
+  "status": "Active"
+}
 ```
 
-Create `backend/.env`:
-```env
-DATABASE_URL=postgresql://postgres:uNqLSPKtRMrQxCTpDdnAgRXFNdpwCcWV@shinkansen.proxy.rlwy.net:51070/railway
-CORS_ORIGINS=http://localhost:3000
+**Response**: Created campaign object with auto-generated ID
+
+### `PATCH /Campaign/{id}/toggle-status`
+Toggles a campaign's status between Active and Paused.
+
+**Response**: Updated campaign object
+
+## 🎨 User Interface
+
+The dashboard features:
+- **Campaign Table**: Displays all campaigns with their metrics
+- **Add Campaign Button**: Opens a form to create new campaigns
+- **Status Filter Dropdown**: Filter campaigns by status
+- **Toggle Buttons**: Click any status button to switch between Active/Paused
+- **Loading States**: Visual feedback during API operations
+- **Error Handling**: User-friendly error messages
+
+## 🔐 Environment Configuration
+
+### Backend
+- `DATABASE_URL`: PostgreSQL connection string
+- `CORS_ORIGINS`: Allowed frontend origins (comma-separated)
+
+### Frontend
+- `NEXT_PUBLIC_API_BASE_URL`: Backend API base URL
+
+## 📁 Project Structure
+
+```
+DataVinci/
+├── backend/
+│   ├── main.py              # FastAPI application
+│   ├── seed_data.py         # Database seeding script
+│   ├── requirements.txt      # Python dependencies
+│   └── .env                 # Environment variables (not in git)
+├── frontend/
+│   ├── pages/
+│   │   ├── _app.tsx         # Next.js app wrapper
+│   │   ├── index.tsx        # Home page (redirects)
+│   │   └── Campaign.tsx      # Campaign dashboard page
+│   ├── styles/
+│   │   └── globals.css      # Global styles
+│   └── package.json         # Node.js dependencies
+├── database.sql             # Database schema and seed data
+└── README.md               # This file
 ```
 
-**Note**: Copy `backend/.env.example` to `backend/.env` and update with your actual database URL.
+## 🛠️ Technology Stack
 
-### 2.2. Install and run locally
-
-From the project root:
-
-```bash
-cd backend
-python -m venv venv
-venv\Scripts\activate  # on Windows
-pip install -r requirements.txt
-
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-The API will be available at:
-
-- `http://localhost:8000/campaigns`
-- Docs: `http://localhost:8000/docs`
-
-The first time the server runs it will create the `campaigns` table in PostgreSQL and insert 10 sample campaigns.
-
-### 2.3. Deploying backend to Railway
-
-See **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** for detailed instructions.
-
-**Quick steps**:
-1. Push repo to GitHub
-2. Create new Railway project from GitHub repo
-3. Set root directory to `backend`
-4. Add environment variables: `DATABASE_URL` and `CORS_ORIGINS`
-5. Set start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-6. Deploy and note the public URL
-
----
-
-## 3. Database SQL (PostgreSQL / SQLite)
-
-The `database.sql` file creates the `campaigns` table and inserts 10 sample rows.
-
-### 3.1. Example commands
-
-**PostgreSQL:**
-
-```bash
-psql -h HOST -U USER -d DB_NAME -f database.sql
-```
-
-You can then run:
-
-```sql
-SELECT * FROM campaigns WHERE status = 'Active';
-```
-
----
-
-## 4. Frontend (Next.js)
-
-### 4.1. Environment Setup
-
-Create a `.env.local` file in the `frontend` folder:
-
-```bash
-cd frontend
-```
-
-Create `frontend/.env.local`:
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
-
-**Note**: Copy `frontend/.env.example` to `frontend/.env.local` and update with your backend URL.
-
-### 4.2. Install and run locally
-
-From the project root:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The app will run on `http://localhost:3000`.
-
-Make sure the FastAPI backend is running on port 8000 when you test locally.
-
-### 4.3. Configure API URL (for deployment)
-
-- **Production (Vercel)**: in Vercel project settings, add environment variable:  
-  `NEXT_PUBLIC_API_BASE_URL=https://your-railway-app.up.railway.app`
-
-### 4.4. Deploying frontend to Vercel
-
-See **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** for detailed instructions.
-
-**Quick steps**:
-1. Push repo to GitHub (if not done)
-2. Import project in Vercel from GitHub
-3. Set root directory to `frontend`
-4. Add environment variable: `NEXT_PUBLIC_API_BASE_URL` (pointing to Railway backend URL)
-5. Deploy and note the public URL
-
----
-
-## 5. What the UI Does
-
-- Shows a table with columns: **Campaign Name**, **Status**, **Clicks**, **Cost**, **Impressions**.
-- Fetches data from `GET /campaigns` on page load.
-- Simple dropdown filter:
-  - **All**
-  - **Active**
-  - **Paused**
-- Basic loading and error message states.
-
----
-
-## 6. For the Loom Video
-
-When recording your Loom video, you can:
-
-- Walk through the folder structure (`frontend`, `backend`, `database.sql`).  
-- Explain `backend/main.py`:
-  - Database model (`CampaignModel`)
-  - Pydantic schema (`Campaign`)
-  - Seed function (inserts 10 rows)
-  - `/campaigns` route that reads from the DB.  
-- Explain `frontend/pages/index.tsx`:
-  - React state for campaigns, filter, loading, and error
-  - `useEffect` that fetches from the backend
-  - Filtered list and table rendering.
-
+- **Frontend**: Next.js, React, TypeScript, CSS
+- **Backend**: FastAPI, Python, SQLAlchemy
+- **Database**: PostgreSQL
+- **Deployment**: Vercel (frontend), Railway (backend)
 
 
