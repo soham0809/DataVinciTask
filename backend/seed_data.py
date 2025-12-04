@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy import Column, Integer, String, Float, create_engine
+from sqlalchemy import Column, Integer, String, Float, create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Load .env file FIRST before any imports
@@ -144,6 +144,17 @@ def seed_database():
         # Insert sample campaigns
         session.add_all(sample_campaigns)
         session.commit()
+        
+        # Fix the sequence to prevent ID conflicts when creating new campaigns
+        try:
+            session.execute(text(
+                "SELECT setval('campaigns_id_seq', COALESCE((SELECT MAX(id) FROM campaigns), 1), true)"
+            ))
+            session.commit()
+        except Exception as e:
+            print(f"Note: Could not update sequence (this is okay if table was just created): {e}")
+            session.rollback()
+        
         print(f"Successfully seeded {len(sample_campaigns)} campaigns into the database!")
 
 

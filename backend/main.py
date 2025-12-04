@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import List, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Path as PathParam
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import Column, Integer, String, Float, create_engine
+from sqlalchemy import Column, Integer, String, Float, create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session as SASession
 
 # Load .env if present (for local dev where you place the production DATABASE_URL)
@@ -73,7 +73,12 @@ app.add_middleware(
 )
 
 
-@app.get("/campaigns", response_model=List[Campaign])
+class CampaignCreate(BaseModel):
+    name: str
+    status: str = "Active"  # Default status
+
+
+@app.get("/Campaign", response_model=List[Campaign])
 def get_campaigns(
     status: Optional[str] = Query(None, description="Filter by status: Active or Paused"),
     page: int = Query(1, ge=1),
@@ -89,3 +94,49 @@ def get_campaigns(
             q = q.filter(CampaignModel.status == status)
         campaigns = q.offset(offset).limit(limit).all()
         return campaigns
+
+
+@app.post("/Campaign", response_model=Campaign, status_code=201)
+def create_campaign(campaign_data: CampaignCreate):
+    """Create a new campaign with default values (clicks=0, cost=0, impressions=0)."""
+    with SessionLocal() as session:  # type: SASession
+        # Validate status
+        if campaign_data.status not in ("Active", "Paused"):
+            raise HTTPException(status_code=400, detail="status must be 'Active' or 'Paused'")
+        
+        # Fix sequence if it's out of sync (in case manual inserts were made)
+        try:
+            session.execute(text(
+                "SELECT setval('campaigns_id_seq', COALESCE((SELECT MAX(id) FROM campaigns), 1), true)"
+            ))
+            session.commit()
+        except Exception:
+            # If sequence doesn't exist or error occurs, continue anyway
+            session.rollback()
+        
+        new_campaign = CampaignModel(
+            name=campaign_data.name,
+            status=campaign_data.status,
+            clicks=0,
+            cost=0.0,
+            impressions=0,
+        )
+        session.add(new_campaign)
+        session.commit()
+        session.refresh(new_campaign)
+        return new_campaign
+
+
+@app.patch("/Campaign/{campaign_id}/toggle-status", response_model=Campaign)
+def toggle_campaign_status(campaign_id: int = PathParam(..., description="Campaign ID")):
+    """Toggle campaign status between Active and Paused."""
+    with SessionLocal() as session:  # type: SASession
+        campaign = session.query(CampaignModel).filter(CampaignModel.id == campaign_id).first()
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        # Toggle status
+        campaign.status = "Paused" if campaign.status == "Active" else "Active"
+        session.commit()
+        session.refresh(campaign)
+        return campaign
