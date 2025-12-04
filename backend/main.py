@@ -1,142 +1,72 @@
-from typing import List
+# backend/main.py
+import os
+from pathlib import Path
+from typing import List, Optional
 
-from fastapi import FastAPI
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String, Float, create_engine
-from sqlalchemy.orm import declarative_base, Session
+from sqlalchemy.orm import declarative_base, sessionmaker, Session as SASession
 
-DATABASE_URL = "sqlite:///./campaigns.db"
+# Load .env if present (for local dev where you place the production DATABASE_URL)
+env_path = Path(__file__).parent / ".env"
+if env_path.exists():
+    # Read and parse manually to handle BOM if present
+    content = env_path.read_text(encoding='utf-8-sig')  # utf-8-sig strips BOM
+    for line in content.splitlines():
+        line = line.strip()
+        if line and not line.startswith('#') and '=' in line:
+            key, value = line.split('=', 1)
+            os.environ[key.strip()] = value.strip()
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is required. Set it in backend/.env or export it.")
+
+# Use the provided DATABASE_URL (Postgres). No sqlite fallback.
+# Ensure psycopg2-binary is installed
+connect_args = {}  # no sqlite check_same_thread
+engine = create_engine(DATABASE_URL, connect_args=connect_args, future=True)
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 Base = declarative_base()
 
 
 class CampaignModel(Base):
-  __tablename__ = "campaigns"
-
-  id = Column(Integer, primary_key=True, index=True)
-  name = Column(String, nullable=False)
-  status = Column(String, nullable=False)
-  clicks = Column(Integer, nullable=False)
-  cost = Column(Float, nullable=False)
-  impressions = Column(Integer, nullable=False)
+    __tablename__ = "campaigns"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    clicks = Column(Integer, nullable=False, default=0)
+    cost = Column(Float, nullable=False, default=0.0)
+    impressions = Column(Integer, nullable=False, default=0)
 
 
 class Campaign(BaseModel):
-  id: int
-  name: str
-  status: str
-  clicks: int
-  cost: float
-  impressions: int
+    id: int
+    name: str
+    status: str
+    clicks: int
+    cost: float
+    impressions: int
 
-  class Config:
-    from_attributes = True
-
-
-def seed_data_if_needed() -> None:
-  Base.metadata.create_all(bind=engine)
-  with Session(engine) as session:
-    count = session.query(CampaignModel).count()
-    if count > 0:
-      return
-
-    sample_campaigns = [
-      CampaignModel(
-        id=1,
-        name="Summer Sale",
-        status="Active",
-        clicks=150,
-        cost=45.99,
-        impressions=1000,
-      ),
-      CampaignModel(
-        id=2,
-        name="Black Friday",
-        status="Paused",
-        clicks=320,
-        cost=89.50,
-        impressions=2500,
-      ),
-      CampaignModel(
-        id=3,
-        name="New Year Blast",
-        status="Active",
-        clicks=210,
-        cost=60.00,
-        impressions=1800,
-      ),
-      CampaignModel(
-        id=4,
-        name="Spring Clearance",
-        status="Paused",
-        clicks=90,
-        cost=25.75,
-        impressions=900,
-      ),
-      CampaignModel(
-        id=5,
-        name="Back to School",
-        status="Active",
-        clicks=300,
-        cost=99.99,
-        impressions=2700,
-      ),
-      CampaignModel(
-        id=6,
-        name="Holiday Specials",
-        status="Active",
-        clicks=180,
-        cost=55.25,
-        impressions=1500,
-      ),
-      CampaignModel(
-        id=7,
-        name="Clearance Bonanza",
-        status="Paused",
-        clicks=75,
-        cost=19.99,
-        impressions=800,
-      ),
-      CampaignModel(
-        id=8,
-        name="Weekend Flash Sale",
-        status="Active",
-        clicks=260,
-        cost=70.10,
-        impressions=2200,
-      ),
-      CampaignModel(
-        id=9,
-        name="Referral Program",
-        status="Active",
-        clicks=140,
-        cost=40.00,
-        impressions=1200,
-      ),
-      CampaignModel(
-        id=10,
-        name="Loyalty Rewards",
-        status="Paused",
-        clicks=110,
-        cost=35.50,
-        impressions=950,
-      ),
-    ]
-
-    session.add_all(sample_campaigns)
-    session.commit()
+    class Config:
+        from_attributes = True
 
 
-seed_data_if_needed()
+# Do NOT call create_all blindly in heavy production; for this assignment it's acceptable
+Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Grippi Campaign API")
+app = FastAPI(title="Grippi Campaign API (Postgres-only)")
 
-# Enable CORS
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+CORS_ORIGINS = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=CORS_ORIGINS or ["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -144,11 +74,18 @@ app.add_middleware(
 
 
 @app.get("/campaigns", response_model=List[Campaign])
-def get_campaigns() -> List[Campaign]:
-  with Session(engine) as session:
-    campaigns = session.query(CampaignModel).all()
-    return campaigns
-
-
-
-
+def get_campaigns(
+    status: Optional[str] = Query(None, description="Filter by status: Active or Paused"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=1000),
+):
+    offset = (page - 1) * limit
+    with SessionLocal() as session:  # type: SASession
+        q = session.query(CampaignModel)
+        if status:
+            status = status.capitalize()
+            if status not in ("Active", "Paused"):
+                raise HTTPException(status_code=400, detail="status must be 'Active' or 'Paused'")
+            q = q.filter(CampaignModel.status == status)
+        campaigns = q.offset(offset).limit(limit).all()
+        return campaigns
