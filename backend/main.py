@@ -78,7 +78,7 @@ class CampaignCreate(BaseModel):
     status: str = "Active"  # Default status
 
 
-@app.get("/Campaign", response_model=List[Campaign])
+@app.get("/campaigns", response_model=List[Campaign])
 def get_campaigns(
     status: Optional[str] = Query(None, description="Filter by status: Active or Paused"),
     page: int = Query(1, ge=1),
@@ -96,7 +96,7 @@ def get_campaigns(
         return campaigns
 
 
-@app.post("/Campaign", response_model=Campaign, status_code=201)
+@app.post("/campaigns", response_model=Campaign, status_code=201)
 def create_campaign(campaign_data: CampaignCreate):
     """Create a new campaign with default values (clicks=0, cost=0, impressions=0)."""
     with SessionLocal() as session:  # type: SASession
@@ -127,7 +127,7 @@ def create_campaign(campaign_data: CampaignCreate):
         return new_campaign
 
 
-@app.patch("/Campaign/{campaign_id}/toggle-status", response_model=Campaign)
+@app.patch("/campaigns/{campaign_id}/toggle-status", response_model=Campaign)
 def toggle_campaign_status(campaign_id: int = PathParam(..., description="Campaign ID")):
     """Toggle campaign status between Active and Paused."""
     with SessionLocal() as session:  # type: SASession
