@@ -21,9 +21,8 @@ if env_path.exists():
             key, value = line.split('=', 1)
             os.environ[key.strip()] = value.strip()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required. Set it in backend/.env or export it.")
+# Hardcoded DATABASE_URL
+DATABASE_URL = "postgresql://postgres:uNqLSPKtRMrQxCTpDdnAgRXFNdpwCcWV@shinkansen.proxy.rlwy.net:51070/railway"
 
 # Use the provided DATABASE_URL (Postgres). No sqlite fallback.
 # Ensure psycopg2-binary is installed
